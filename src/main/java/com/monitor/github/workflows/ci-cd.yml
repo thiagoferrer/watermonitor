@@ -1,19 +1,29 @@
-name: Meu primeiro workflow
-on: push
+name: 03 - Actions
+
+on:
+  push:
+    branches: "feature/**"
+
 jobs:
-  job1-hello:
+  checkout_java_docker:
     runs-on: ubuntu-latest
     steps:
-      - name: Imprimir mensagem
-        run: echo "Olá, Mundo"
+      - name: Git Checkout
+        uses: actions/checkout@v4
 
-  job2-goodbye:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Step 1 - Sequencia de instruções
+      - name: Setup Java SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+
+      - name: Executar scripts
         run: |
-          echo "Uma nova instrução"
-          ls
-
-      - name: Step 2 - Imprimir mensagem
-        run: echo "Até logo!"
+          git branch
+          java --version
+          mvn clean package
