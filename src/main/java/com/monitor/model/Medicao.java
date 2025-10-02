@@ -2,13 +2,14 @@ package com.monitor.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 
 import java.time.LocalDate;
 
 
-@Entity(name = "MEDICAO")
+@Entity
+@Table(name = "medicoes")
 public class Medicao {
 
     @Id
@@ -16,17 +17,35 @@ public class Medicao {
     private Long id;
 
     @NotBlank(message = "Localização é obrigatória")
+    @Column(nullable = false)
     private String localizacao;
 
-    @Positive(message = "Consumo deve ser um valor positivo")
+    @Positive(message = "Consumo deve ser positivo")
+    @Column(name = "consumo_litros", nullable = false)
     private Double consumoLitros;
 
-    @NotNull(message = "Data da medição é obrigatória")
+    @PastOrPresent(message = "Data não pode ser futura")
+    @Column(name = "data_medicao", nullable = false)
     private LocalDate dataMedicao;
 
     @NotBlank(message = "Campo alerta é obrigatório")
+    @Column(nullable = false)
     private String alerta;
 
+    // ✅ CONSTRUTOR PADRÃO (OBRIGATÓRIO)
+    public Medicao() {
+    }
+
+    // ✅ CONSTRUTOR COMPLETO
+    public Medicao(Long id, String localizacao, Double consumoLitros, LocalDate dataMedicao, String alerta) {
+        this.id = id;
+        this.localizacao = localizacao;
+        this.consumoLitros = consumoLitros;
+        this.dataMedicao = dataMedicao;
+        this.alerta = alerta;
+    }
+
+    // ✅ GETTERS E SETTERS
     public Long getId() {
         return id;
     }
@@ -65,5 +84,17 @@ public class Medicao {
 
     public void setAlerta(String alerta) {
         this.alerta = alerta;
+    }
+
+    // ✅ TO STRING (OPCIONAL MAS ÚTIL)
+    @Override
+    public String toString() {
+        return "Medicao{" +
+                "id=" + id +
+                ", localizacao='" + localizacao + '\'' +
+                ", consumoLitros=" + consumoLitros +
+                ", dataMedicao=" + dataMedicao +
+                ", alerta='" + alerta + '\'' +
+                '}';
     }
 }

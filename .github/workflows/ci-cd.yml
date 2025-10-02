@@ -45,7 +45,7 @@ jobs:
     steps:
       - name: Deploy to Staging
         run: |
-          echo "📦 Deploying to STAGING environment"
+          echo " Deploying to STAGING environment"
           # Simulação de deploy - depois você substitui pelo real
 
   deploy-production:
@@ -56,5 +56,5 @@ jobs:
     steps:
       - name: Deploy to Production
         run: |
-          echo "🎯 Deploying to PRODUCTION environment"
+          echo " Deploying to PRODUCTION environment"
           # Simulação de deploy - depois você substitui pelo real
