@@ -1,73 +1,19 @@
-name: CI/CD Pipeline - Monitor App
-
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-
+name: Meu primeiro workflow
+on: push
 jobs:
-  # Job de Build e Testes
-  build-and-test:
+  job1-hello:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v4
+      - name: Imprimir mensagem
+        run: echo "Olá, Mundo"
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Build com Maven
-        run: mvn clean package -DskipTests
-
-      - name: Executar testes
-        run: mvn test
-
-      - name: Upload artefato do build
-        uses: actions/upload-artifact@v4
-        with:
-          name: monitor-app
-          path: target/*.jar
-
-  # Job de Deploy para Staging
-  deploy-staging:
+  job2-goodbye:
     runs-on: ubuntu-latest
-    needs: build-and-test
-
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v4
+      - name: Step 1 - Sequencia de instruções
+        run: |
+          echo "Uma nova instrução"
+          ls
 
-      - name: Baixar artefato do build
-        uses: actions/download-artifact@v4
-        with:
-          name: monitor-app
-
-      - name: Build da imagem Docker
-        run: docker build -t monitor-app:staging .
-
-      - name: Log de sucesso Staging
-        run: echo "✅ Deploy para STAGING concluído - Aplicação pronta para testes"
-
-  # Job de Deploy para Produção (manual)
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - name: Aprovação manual para Produção
-        uses: trstringer/manual-approval@v1
-        with:
-          secret: ${{ github.TOKEN }}
-          approvers: ${{ vars.APPROVERS || 'monitor-admin' }}
-          minimum-approvals: 1
-          issue-title: 'Aprovação necessária para deploy em Produção'
-          issue-body: 'Por favor, aprove o deploy da aplicação Monitor para produção.'
-
-      - name: Log de sucesso Produção
-        run: echo "🚀 Deploy para PRODUÇÃO aprovado - Aplicação em produção"
+      - name: Step 2 - Imprimir mensagem
+        run: echo "Até logo!"
