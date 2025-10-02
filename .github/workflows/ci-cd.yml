@@ -1,4 +1,4 @@
-name: CI/CD with Docker
+name: CI/CD with PostgreSQL and Docker
 
 on:
   push:
@@ -11,6 +11,21 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_DB: monitor_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,21 +36,48 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build and run tests
+      - name: Build and test with PostgreSQL
         run: |
-          mvn clean package
+          mvn clean compile
           mvn test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: password123
+
+      - name: Build JAR package
+        run: mvn clean package -DskipTests
 
       - name: Build Docker image
         run: |
           docker build -t $IMAGE_NAME:$GITHUB_SHA .
 
-      - name: Run container tests
+      - name: Run container integration test
         run: |
-          docker run -d -p 8080:8080 --name test-api $IMAGE_NAME:$GITHUB_SHA
+          docker run -d --name test-db \
+            -e POSTGRES_DB=monitor_db \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=password123 \
+            -p 5432:5432 \
+            postgres:13
+          
+          sleep 20
+          
+          docker run -d \
+            --name test-api \
+            --link test-db:postgres \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://test-db:5432/monitor_db \
+            -e SPRING_DATASOURCE_USERNAME=postgres \
+            -e SPRING_DATASOURCE_PASSWORD=password123 \
+            -p 8080:8080 \
+            $IMAGE_NAME:$GITHUB_SHA
+          
           sleep 30
+          
           curl -f http://localhost:8080/api/medicoes || exit 1
-          docker stop test-api
+          
+          docker stop test-api test-db
+          docker rm test-api test-db
 
   deploy-staging:
     runs-on: ubuntu-latest
@@ -45,8 +87,7 @@ jobs:
     steps:
       - name: Deploy to Staging
         run: |
-          echo " Deploying to STAGING environment"
-          # Simulação de deploy - depois você substitui pelo real
+          echo "📦 Deploying to STAGING environment"
 
   deploy-production:
     runs-on: ubuntu-latest
@@ -56,5 +97,4 @@ jobs:
     steps:
       - name: Deploy to Production
         run: |
-          echo " Deploying to PRODUCTION environment"
-          # Simulação de deploy - depois você substitui pelo real
+          echo "🎯 Deploying to PRODUCTION environment"
