@@ -1,35 +1,32 @@
+# docker-compose.yml ATUALIZADO (REMOVA a linha version)
 services:
-  postgres-db:
-    image: postgres:15
-    container_name: postgres-monitor
+  app:
+    build: .
+    ports:
+      - "8080:8080"
     environment:
-      POSTGRES_DB: monitordb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123456  # ← SENHA SUPER SIMPLES
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-fiap.postgres.database.azure.com:5432/postgres
+      - SPRING_DATASOURCE_USERNAME=fiap
+      - SPRING_DATASOURCE_PASSWORD=SuaSenha123!
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+    depends_on:
+      - db
+    networks:
+      - monitor-network
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=monitor_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - monitor-network
-    # ADICIONE ESTA LINHA para forçar a senha
-    command: postgres -c log_statement=all
-
-  monitor-app:
-    build: .
-    container_name: monitor-app
-    environment:
-      SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/monitordb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: senha123
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres-db
-    networks:
-      - monitor-network
-    restart: unless-stopped
 
 volumes:
   postgres_data:

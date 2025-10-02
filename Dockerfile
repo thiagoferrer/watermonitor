@@ -1,27 +1,18 @@
-# Estágio de construção (Build)
-FROM maven:3.9.9-eclipse-temurin-21 AS build
+# Dockerfile
+FROM openjdk:21-jdk-slim
+
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos do projeto
-COPY pom.xml .
-COPY src ./src
+# Copia o arquivo JAR (vamos construir ele no pipeline)
+COPY target/monitor-0.0.1-SNAPSHOT.jar app.jar
 
-# Compila o projeto (ignora testes por enquanto)
-RUN mvn clean package -DskipTests
+# Cria um usuário não-root por segurança
+RUN groupadd -r spring && useradd -r -g spring spring
+USER spring
 
-# Estágio de execução (Runtime)
-FROM eclipse-temurin:21-jre
-WORKDIR /app
-
-# Copia o JAR gerado no estágio de build
-COPY --from=build /app/target/*.jar app.jar
-
-# Variáveis de ambiente
-ENV SPRING_PROFILES_ACTIVE=docker
-ENV JAVA_OPTS="-Xmx512m -Xms256m"
-
-# Expõe a porta da aplicação
+# Expoe a porta da aplicação
 EXPOSE 8080
 
-# Comando para executar a aplicação
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Comando para rodar a aplicação
+ENTRYPOINT ["java", "-jar", "app.jar"]
