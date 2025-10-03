@@ -1,217 +1,112 @@
 # Projeto - Cidades ESGInteligentes
 
-Sistema de monitoramento de consumo de água para cidades inteligentes, desenvolvido como parte do projeto FIAP. A aplicação fornece uma API REST para gerenciar medições de consumo de água com alertas ESG.
+## 📋 Descrição do Projeto
+Sistema de monitoramento e gestão de recursos e serviços para cidades inteligentes, com foco em métricas ESG (Environmental, Social, and Governance). A API permite o cadastro, consulta e gerenciamento de medições de consumo de recursos.
 
-## 📋 Como executar localmente com Docker
+## 🚀 Como executar localmente com Docker
 
 ### Pré-requisitos
-- Docker e Docker Compose instalados
-- Java 21 (opcional, apenas para desenvolvimento)
-- Maven (opcional, apenas para desenvolvimento)
+- Docker instalado
+- Docker Compose
+- Git
 
-### Execução Rápida
+### Passos para execução
 
-1. **Clone o repositório:**
+1. **Clone o repositório**
 ```bash
-git clone https://github.com/thiagofcarvalho/monitor.git
-cd monitor
+git clone <url-do-repositorio>
+cd medicao-api
 ```
 
-2. **Execute a aplicação:**
+2. **Execute com Docker Compose**
 ```bash
-docker-compose up --build
+docker-compose up -d
 ```
 
-3. **Acesse a aplicação:**
-- **API:** http://localhost:8080/api/medicoes
-- **Swagger UI:** http://localhost:8080/swagger-ui.html
-- **H2 Console:** http://localhost:8080/h2-console
-
-### Configuração do Banco de Dados Local
-
-O Docker Compose configura automaticamente:
-- **PostgreSQL:** Porta 5433
-- **Aplicação:** Porta 8080
-- **Credenciais:**
-    - Database: `monitor_db`
-    - Username: `postgres`
-    - Password: `password123`
-
-### Comandos Úteis
-
+3. **Verifique se os containers estão rodando**
 ```bash
-# Parar a aplicação
+docker ps
+```
+
+4. **Acesse a aplicação**
+```
+http://localhost:8080/api/medicoes
+```
+
+5. **Documentação da API (Swagger)**
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+6. **Para parar a aplicação**
+```bash
 docker-compose down
-
-# Ver logs
-docker-compose logs -f
-
-# Rebuildar imagens
-docker-compose build --no-cache
 ```
 
 ## 🔄 Pipeline CI/CD
 
 ### Ferramentas Utilizadas
-- **GitHub Actions** - Automação do pipeline
-- **Azure App Service** - Plataforma de deploy
-- **Azure PostgreSQL** - Banco de dados em nuvem
-- **Docker** - Containerização
+- **GitHub Actions**: Plataforma de CI/CD
+- **Maven**: Gerenciamento de dependências e build
+- **Docker**: Containerização da aplicação
+- **PostgreSQL**: Banco de dados
 
 ### Etapas do Pipeline
 
-#### 1. Trigger Automático
-```yaml
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-```
+#### 1. Build and Test
+- **Trigger**: Push nas branches `main` e `develop`
+- **Serviços**: Container PostgreSQL para testes
+- **Etapas**:
+    - Checkout do código
+    - Setup JDK 17
+    - Build e testes com Maven
+    - Build do JAR
+    - Build da imagem Docker
+    - Teste de integração com containers
 
-#### 2. Build e Testes
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-      
-      - name: Build with Maven
-        run: mvn clean package -DskipTests
-```
+#### 2. Deploy Staging
+- **Condição**: Branch `develop`
+- **Ação**: Deploy automático para ambiente de staging
 
-#### 3. Deploy para Azure
-```yaml
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: 'monitor-fiap-554460'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: target/*.jar
-```
-
-### Configuração de Secrets no GitHub
-
-1. Acesse: `Settings > Secrets and variables > Actions`
-2. Adicione o secret: `AZURE_WEBAPP_PUBLISH_PROFILE`
-3. Cole o conteúdo completo do XML do perfil de publicação do Azure
-
-### Pipeline Completo
-
-```yaml
-name: Deploy to Azure App Service
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Java
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: 'maven'
-    
-    - name: Build with Maven
-      run: mvn clean package -DskipTests
-    
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'monitor-fiap-554460'
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: target/monitor-0.0.1-SNAPSHOT.jar
-    
-    - name: Verify deployment
-      run: |
-        sleep 30
-        curl -f https://monitor-fiap-554460.azurewebsites.net/api/medicoes || exit 1
-```
+#### 3. Deploy Production
+- **Condição**: Branch `main`
+- **Ação**: Deploy automático para ambiente de produção
 
 ## 🐳 Containerização
 
 ### Dockerfile
-
 ```dockerfile
 FROM openjdk:21-jdk-slim
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia o arquivo JAR
 COPY target/monitor-0.0.1-SNAPSHOT.jar app.jar
 
-# Cria um usuário não-root por segurança
 RUN groupadd -r spring && useradd -r -g spring spring
 USER spring
 
-# Expoe a porta da aplicação
 EXPOSE 8080
 
-# Comando para rodar a aplicação
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
 ### Estratégias Adotadas
+- **Imagem leve**: Uso do OpenJDK slim
+- **Segurança**: Usuário não-root
+- **Portas**: Exposição apenas da porta necessária (8080)
 
-#### 1. Segurança
-- **Usuário não-root:** Previne privilégios desnecessários
-- **Imagem oficial:** OpenJDK slim para reduzir superficie de ataque
-- **Versão específica:** Java 21 LTS para estabilidade
-
-#### 2. Performance
-- **Imagem slim:** Redução de tamanho em ~50% comparado com imagens completas
-- **Layer caching:** Otimização de rebuilds
-- **Multi-stage build:** Separação entre build e runtime
-
-#### 3. Boas Práticas
-```dockerfile
-# Health check para monitoramento
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
-
-# Variáveis de ambiente para configuração
-ENV SPRING_PROFILES_ACTIVE=docker
-```
-
-### Docker Compose para Desenvolvimento
-
+### Docker Compose
 ```yaml
-version: '3.8'
-
 services:
   app:
     build: .
-    ports:
-      - "8080:8080"
+    ports: ["8080:8080"]
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/monitor_db
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=password123
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
     depends_on:
       - db
-    networks:
-      - monitor-network
 
   db:
     image: postgres:13
@@ -219,189 +114,158 @@ services:
       - POSTGRES_DB=monitor_db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password123
-    ports:
-      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - monitor-network
-
-volumes:
-  postgres_data:
-
-networks:
-  monitor-network:
-    driver: bridge
 ```
 
 ## 📸 Evidências de Funcionamento
 
-### Ambiente de Produção (Azure)
+### Execução do Pipeline
+- **Build e Testes**: ![img_5.png](img_5.png)
+- **Deploy Staging**: [Incluir print do deploy para staging]
+- **Deploy Production**: [Incluir print do deploy para produção]
 
-#### 1. Aplicação em Produção
-**URL:** https://monitor-fiap-554460.azurewebsites.net
+### API em Funcionamento
+- **Swagger UI**: ![img_1.png](img_1.png)
+- **Endpoints Testados**: ![img.png](img.png)![img_2.png](img_2.png)![img_3.png](img_3.png)![img_4.png](img_4.png)
 
-**Endpoints testados:**
-- ✅ `GET /api/medicoes` - Listagem de medições
-- ✅ `POST /api/medicoes` - Criação de medições
-- ✅ `GET /api/medicoes/{id}` - Busca por ID
-- ✅ `DELETE /api/medicoes/{id}` - Exclusão
+### Containers
+- **Docker PS**: 
+ ```
+ PS C:\Projetos\monitor\monitor> docker ps
+  CONTAINER ID   IMAGE         COMMAND                  CREATED        STATUS        PORTS                                         NAMES
+  f71a36102fe1   postgres:15   "docker-entrypoint.s…"   10 hours ago   Up 10 hours   0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp   postgres-monitor
+  PS C:\Projetos\monitor\monitor> docker ps -a
+  CONTAINER ID   IMAGE         COMMAND                  CREATED        STATUS        PORTS                                         NAMES
+  f71a36102fe1   postgres:15   "docker-entrypoint.s…"   10 hours ago   Up 10 hours   0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp   postgres-monitor
+  PS C:\Projetos\monitor\monitor>
+  ```
 
-#### 2. Swagger UI em Produção
-**URL:** https://monitor-fiap-554460.azurewebsites.net/swagger-ui.html
-
-![Swagger UI](https://monitor-fiap-554460.azurewebsites.net/swagger-ui.html)
-
-#### 3. Exemplo de Request/Response
-```bash
-# Request
-POST /api/medicoes
-{
-  "localizacao": "Setor Comercial Norte - QN 102",
-  "consumoLitros": 1250.75,
-  "dataMedicao": "2024-01-15",
-  "alerta": "CONSUMO_MODERADO"
-}
-
-# Response
-{
-  "id": 1,
-  "localizacao": "Setor Comercial Norte - QN 102",
-  "consumoLitros": 1250.75,
-  "dataMedicao": "2024-01-15",
-  "alerta": "CONSUMO_MODERADO"
-}
+- **Logs**:
 ```
+PS C:\Projetos\monitor\monitor> docker-compose logs app
+app-1  | 
+app-1  |   .   ____          _            __ _ _
+app-1  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+app-1  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+app-1  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+app-1  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+app-1  |  =========|_|==============|___/=/_/_/_/
+app-1  | 
+app-1  |  :: Spring Boot ::                (v3.5.6)
+app-1  | 
+app-1  | 2025-10-03T21:52:05.402Z  INFO 1 --- [           main] com.monitor.MonitorApplication           : Starting MonitorApplication v0.0.1-SNAPSHOT using Java 21 with PID 1 (/app/app.jar started by spring in /app)
+app-1  | 2025-10-03T21:52:05.405Z  INFO 1 --- [           main] com.monitor.MonitorApplication           : No active profile set, falling back to 1 default profile: "default"
+app-1  | 2025-10-03T21:52:06.467Z  INFO 1 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+app-1  | 2025-10-03T21:52:06.523Z  INFO 1 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 45 ms. Found 1 JPA repository interface.
+app-1  | 2025-10-03T21:52:07.287Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+app-1  | 2025-10-03T21:52:07.309Z  INFO 1 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+app-1  | 2025-10-03T21:52:07.310Z  INFO 1 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.46]
+app-1  | 2025-10-03T21:52:07.349Z  INFO 1 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+app-1  | 2025-10-03T21:52:07.351Z  INFO 1 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1896 ms
+app-1  | 2025-10-03T21:52:07.622Z  INFO 1 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+app-1  | 2025-10-03T21:52:07.740Z  INFO 1 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.29.Final
+app-1  | 2025-10-03T21:52:07.779Z  INFO 1 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+app-1  | 2025-10-03T21:52:08.173Z  INFO 1 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+app-1  | 2025-10-03T21:52:08.210Z  INFO 1 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+app-1  | 2025-10-03T21:52:08.351Z  INFO 1 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@51132514
+app-1  | 2025-10-03T21:52:08.353Z  INFO 1 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+app-1  | 2025-10-03T21:52:08.399Z  WARN 1 --- [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+app-1  | 2025-10-03T21:52:08.416Z  INFO 1 --- [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+app-1  |        Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+app-1  |        Database driver: undefined/unknown
+app-1  |        Database version: 13.22
+app-1  |        Autocommit mode: undefined/unknown
+app-1  |        Isolation level: undefined/unknown
+app-1  |        Minimum pool size: undefined/unknown
+app-1  |        Maximum pool size: undefined/unknown
+app-1  | 2025-10-03T21:52:09.076Z  INFO 1 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+app-1  | Hibernate: 
+app-1  |     create table medicao (
+app-1  |         id bigint generated by default as identity,
+app-1  |         alerta varchar(255) not null,
+app-1  |         consumo_litros float(53),
+app-1  |         data_medicao date not null,
+app-1  |         localizacao varchar(255) not null,
+app-1  |         primary key (id)
+app-1  |     )
+app-1  | 2025-10-03T21:52:09.173Z  INFO 1 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+app-1  | 2025-10-03T21:52:09.513Z  WARN 1 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+app-1  | 2025-10-03T21:52:09.941Z  INFO 1 --- [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name userDetailsService
+app-1  | 2025-10-03T21:52:10.562Z  INFO 1 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+app-1  | 2025-10-03T21:52:10.570Z  INFO 1 --- [           main] com.monitor.MonitorApplication           : Started MonitorApplication in 5.695 seconds (process running for 6.745)
+PS C:\Projetos\monitor\monitor>  
 
-#### 4. Azure Portal - Recursos Criados
-- **App Service:** `monitor-fiap-554460`
-- **PostgreSQL:** `postgres-fiap-554460`
-- **Resource Group:** `rg-monitor-fiap`
-
-### Pipeline em Execução
-
-#### 1. Build Successful
 ```
-[INFO] BUILD SUCCESS
-[INFO] Total time: 38.184 s
-[INFO] Finished at: 2025-10-03T19:45:26Z
-```
-
-#### 2. Deploy Successful
-```
-Status: Building the app... Time: 34(s)
-Status: Build successful. Time: 50(s)
-Status: Site started successfully. Time: 81(s)
-Status: RuntimeSuccessful
-```
-
-### Validações Implementadas
-
-#### 1. Validações de Dados
-```java
-@NotBlank(message = "Localização é obrigatória")
-private String localizacao;
-
-@Positive(message = "Consumo deve ser positivo")
-private Double consumoLitros;
-
-@PastOrPresent(message = "Data não pode ser futura")
-private LocalDate dataMedicao;
-```
-
-#### 2. Tratamento de Erros
-```json
-{
-  "localizacao": "não deve estar em branco",
-  "consumoLitros": "deve ser positivo"
-}
-```
-
 ## 🛠 Tecnologias Utilizadas
 
 ### Backend
-| Tecnologia | Versão | Finalidade |
-|------------|--------|------------|
-| **Java** | 21 | Linguagem de programação |
-| **Spring Boot** | 3.5.6 | Framework principal |
-| **Spring Data JPA** | 3.5.4 | Persistência de dados |
-| **Spring Security** | 6.5.5 | Autenticação e autorização |
-| **SpringDoc OpenAPI** | 2.8.5 | Documentação da API |
-| **Hibernate** | 6.6.29 | ORM |
-| **Maven** | 3.9+ | Gerenciamento de dependências |
+- **Java 17**: Linguagem de programação
+- **Spring Boot 3.5.6**: Framework principal
+- **Spring Data JPA**: Persistência de dados
+- **Spring Security**: Segurança da API
+- **Spring Validation**: Validação de dados
+- **Maven**: Gerenciamento de dependências
 
 ### Banco de Dados
-| Tecnologia | Versão | Ambiente |
-|------------|--------|----------|
-| **PostgreSQL** | 13 | Produção (Azure) |
-| **PostgreSQL** | 13 | Desenvolvimento (Docker) |
-| **H2 Database** | 2.2+ | Testes (em memória) |
+- **PostgreSQL 13**: Banco de dados relacional
+- **JPA/Hibernate**: ORM
 
-### Infraestrutura e DevOps
-| Tecnologia | Finalidade |
-|------------|------------|
-| **Docker** | Containerização |
-| **Docker Compose** | Orquestração local |
-| **Azure App Service** | Deploy em produção |
-| **Azure PostgreSQL** | Banco de dados em nuvem |
-| **GitHub Actions** | CI/CD Pipeline |
-| **Azure CLI** | Gerenciamento de recursos |
+### Containerização & DevOps
+- **Docker**: Containerização
+- **Docker Compose**: Orquestração local
+- **GitHub Actions**: CI/CD
+- **Git**: Controle de versão
 
-### Ferramentas de Desenvolvimento
-| Tecnologia | Finalidade |
-|------------|------------|
-| **Spring Boot DevTools** | Desenvolvimento rápido |
-| **Lombok** | Redução de boilerplate |
-| **Spring Boot Actuator** | Monitoramento |
-| **Swagger UI** | Documentação interativa |
-| **H2 Console** | Interface do banco |
+### Documentação
+- **SpringDoc OpenAPI**: Documentação automática da API
+- **Swagger UI**: Interface interativa
 
-### Segurança e Qualidade
-| Tecnologia | Finalidade |
-|------------|------------|
-| **Spring Security** | Proteção da API |
-| **Bean Validation** | Validação de dados |
-| **Global Exception Handler** | Tratamento centralizado |
-| **JUnit 5** | Testes unitários |
-| **Mockito** | Mocking em testes |
-
-### Monitoramento e Logs
-| Tecnologia | Finalidade |
-|------------|------------|
-| **SLF4J** | Logging facade |
-| **Logback** | Implementação de logging |
-| **Micrometer** | Métricas da aplicação |
-| **Azure Monitor** | Monitoramento em produção |
-
+### Testes
+- **JUnit**: Framework de testes
+- **Spring Boot Test**: Testes de integração
 
 ## 📊 Estrutura do Projeto
 
 ```
-src/
-├── main/
-│   ├── java/com/monitor/
-│   │   ├── controller/     # Controladores REST
-│   │   ├── service/        # Lógica de negócio
-│   │   ├── repository/     # Camada de dados
-│   │   ├── model/          # Entidades JPA
-│   │   ├── security/       # Configurações de segurança
-│   │   └── exception/      # Tratamento de exceções
-│   └── resources/
-│       └── application.properties
+medicao-api/
+├── src/
+│   └── main/
+│       └── java/
+│           └── com/monitor/
+│               ├── controller/     # Controladores REST
+│               ├── model/          # Entidades JPA
+│               ├── repository/     # Repositórios Spring Data
+│               ├── service/        # Lógica de negócio
+│               ├── security/       # Configurações de segurança
+│               └── exception/      # Tratamento de exceções
+├── .github/workflows/              # Pipeline CI/CD
+├── docker-compose.yml              # Orquestração local
+├── Dockerfile                      # Build da imagem
+└── pom.xml                         # Dependências Maven
 ```
 
-A aplicação está configurada para ambiente de produção na Azure com variáveis de ambiente seguras e deploy automatizado através do pipeline CI/CD.
+---
 
-## 👥 Desenvolvido por
+## ✅ Checklist de Entrega
 
-**Equipe Cidades ESGInteligentes**  
-*Tecnologia para Cidades Sustentáveis*
+| Item | Status |
+|------|--------|
+| Projeto compactado em .ZIP com estrutura organizada | ✅ |
+| Dockerfile funcional | ✅ |
+| docker-compose.yml ou arquivos Kubernetes | ✅ |
+| Pipeline com etapas de build, teste e deploy | ✅ |
+| README.md com instruções e prints | ✅ |
+| Documentação técnica com evidências (PDF ou PPT) | ✅ |
+| Deploy realizado nos ambientes staging e produção | ✅ |
+
+---
+
+**Desenvolvido por**: 
+
 ```
 Guilherme Fernandes - RM558174
 Cauã Rodrigues - RM557062
 Gustavo Godoy - RM556757
 Thiago Carvalho - RM554460
 ```
----
-
-**📄 Licença:** MIT  

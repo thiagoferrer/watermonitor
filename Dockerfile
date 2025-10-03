@@ -1,18 +1,14 @@
-# Dockerfile
-FROM openjdk:21-jdk-slim
+FROM openjdk:17-jdk-slim  # ✅ Usar JDK 17 (compatível com seu setup)
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia o arquivo JAR (vamos construir ele no pipeline)
-COPY target/monitor-0.0.1-SNAPSHOT.jar app.jar
+# Copia o JAR (nome correto)
+COPY target/*.jar app.jar  # ✅ Pattern mais flexível
 
-# Cria um usuário não-root por segurança
+# Cria usuário não-root
 RUN groupadd -r spring && useradd -r -g spring spring
 USER spring
 
-# Expoe a porta da aplicação
 EXPOSE 8080
 
-# Comando para rodar a aplicação
 ENTRYPOINT ["java", "-jar", "app.jar"]
