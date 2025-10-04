@@ -36,9 +36,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build and test with PostgreSQL
+      - name: Build application
         run: |
+          echo "🔨 Building application..."
           mvn clean compile
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: password123
+
+      - name: Run tests
+        run: |
+          echo "🧪 Running tests..."
           mvn test
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
@@ -46,95 +55,77 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: password123
 
       - name: Build JAR package
-        run: mvn clean package -DskipTests
+        run: |
+          echo "📦 Building JAR..."
+          mvn clean package -DskipTests
+
+      - name: Verify JAR file
+        run: |
+          echo "🔍 Verifying JAR..."
+          ls -la target/
+          find target/ -name "*.jar" -type f
 
       - name: Build Docker image
         run: |
+          echo "🐳 Building Docker image..."
           docker build -t $IMAGE_NAME:$GITHUB_SHA .
 
       - name: Run container integration test
         run: |
+          echo "🚀 Running container tests..."
           docker run -d --name test-db \
             -e POSTGRES_DB=monitor_db \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=password123 \
-            -p 5433:5432 \  # ✅ Mudei para porta 5433 para evitar conflito
+            -p 5433:5432 \
             postgres:13
           
           sleep 20
+          echo "📊 PostgreSQL container started..."
           
           docker run -d \
             --name test-api \
-            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/monitor_db \  # ✅ Conecta na porta 5433
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/monitor_db \
             -e SPRING_DATASOURCE_USERNAME=postgres \
             -e SPRING_DATASOURCE_PASSWORD=password123 \
             -p 8080:8080 \
             $IMAGE_NAME:$GITHUB_SHA
           
           sleep 30
+          echo "🔌 Testing API connection..."
           
           curl -f http://localhost:8080/api/medicoes || exit 1
           
           docker stop test-api test-db
           docker rm test-api test-db
+          echo "✅ Container tests passed!"
 
-  # ✅ Job de DEBUG para verificar o contexto do GitHub
   debug-context:
     runs-on: ubuntu-latest
     steps:
-      - name: Show Full GitHub Context
+      - name: Show GitHub Context
         run: |
-          echo "🔍 FULL GITHUB CONTEXT DEBUG:"
-          echo "=== BRANCH INFORMATION ==="
-          echo "GitHub Ref: '${{ github.ref }}'"
-          echo "GitHub Base Ref: '${{ github.base_ref }}'"
-          echo "GitHub Head Ref: '${{ github.head_ref }}'"
-          echo "GitHub Event: '${{ github.event_name }}'"
-          echo "GitHub SHA: '${{ github.sha }}'"
-          echo ""
-          echo "=== CONDITION CHECKS ==="
-          echo "Is main branch: '${{ github.ref == 'refs/heads/main' }}'"
-          echo "Is develop branch: '${{ github.ref == 'refs/heads/develop' }}'"
-          echo "Contains 'main': '${{ contains(github.ref, 'main') }}'"
-          echo "Contains 'develop': '${{ contains(github.ref, 'develop') }}'"
-          echo ""
-          echo "=== FULL CONTEXT ==="
-          echo '${{ toJSON(github) }}'
+          echo "🔍 GITHUB CONTEXT:"
+          echo "Ref: '${{ github.ref }}'"
+          echo "Is main: ${{ github.ref == 'refs/heads/main' }}"
+          echo "Is develop: ${{ github.ref == 'refs/heads/develop' }}"
 
   deploy-staging:
     runs-on: ubuntu-latest
-    needs: [build-and-test, debug-context]  # ✅ Agora depende do debug também
-    if: always()  # ✅ EXECUTA SEMPRE para debug
+    needs: [build-and-test, debug-context]
+    if: github.ref == 'refs/heads/develop'
 
     steps:
-      - name: Debug Staging Branch Info
-        run: |
-          echo "🔍 STAGING DEBUG:"
-          echo "GitHub Ref: '${{ github.ref }}'"
-          echo "Expected: 'refs/heads/develop'"
-          echo "Condition: ${{ github.ref == 'refs/heads/develop' }}"
-          echo "Should deploy to staging: ${{ github.ref == 'refs/heads/develop' }}"
-
       - name: Deploy to Staging
         run: |
           echo "📦 Deploying to STAGING environment"
-          echo "✅ STAGING DEPLOYMENT TRIGGERED"
 
   deploy-production:
     runs-on: ubuntu-latest
-    needs: [build-and-test, debug-context]  # ✅ Agora depende do debug também
-    if: always()  # ✅ EXECUTA SEMPRE para debug
+    needs: [build-and-test, debug-context]
+    if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Debug Production Branch Info
-        run: |
-          echo "🔍 PRODUCTION DEBUG:"
-          echo "GitHub Ref: '${{ github.ref }}'"
-          echo "Expected: 'refs/heads/main'"
-          echo "Condition: ${{ github.ref == 'refs/heads/main' }}"
-          echo "Should deploy to production: ${{ github.ref == 'refs/heads/main' }}"
-
       - name: Deploy to Production
         run: |
           echo "🎯 Deploying to PRODUCTION environment"
-          echo "✅ PRODUCTION DEPLOYMENT TRIGGERED"
