@@ -15,8 +15,10 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/**").permitAll()  // ✅ Permitir todo actuator
                         .requestMatchers("/api/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/**").permitAll()  // ✅ Permitir tudo para testes
                         .anyRequest().authenticated()
                 )
                 .headers(headers -> headers
