@@ -23,7 +23,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
         ports:
-          - 5433:5432
+          - 5432:5432  # ✅ Mudar para porta padrão
 
     steps:
       - name: Checkout code
@@ -47,15 +47,13 @@ jobs:
         run: |
           sudo apt-get install -y postgresql-client
           echo "Aguardando PostgreSQL..."
-          sleep 10
-          pg_isready -h localhost -p 5433 -U postgres || echo "PostgreSQL ainda não está pronto"
-          sleep 5
-          pg_isready -h localhost -p 5433 -U postgres
+          sleep 15
+          pg_isready -h localhost -p 5432 -U postgres
 
       - name: Build with Maven
         run: mvn clean package -DskipTests
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/monitor_db
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: password123
 
@@ -64,48 +62,47 @@ jobs:
           docker build -t monitor-app:$GITHUB_SHA .
           docker images
 
-      # ✅ CORREÇÃO: Usar network do Docker para conectar containers
-      - name: Test Docker container with network
+      # ✅ CORREÇÃO SIMPLIFICADA: Usar host.docker.internal
+      - name: Test Docker container
         run: |
-          # Criar network customizada
-          docker network create test-network
-          
-          # Conectar o PostgreSQL à network
-          docker network connect test-network postgres
-          
-          # Rodar a aplicação na MESMA network
-          docker run -d --name test-app --network test-network \
-            -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/monitor_db \
+          # Rodar a aplicação com acesso ao host
+          docker run -d --name test-app \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/monitor_db \
             -e SPRING_DATASOURCE_USERNAME=postgres \
             -e SPRING_DATASOURCE_PASSWORD=password123 \
             -p 8080:8080 \
+            --add-host=host.docker.internal:host-gateway \
             monitor-app:$GITHUB_SHA
           
           echo "Aguardando aplicação iniciar..."
-          sleep 45  # ✅ Aumentar tempo de espera
+          sleep 60  # ✅ Tempo maior para inicialização
           
-          # Teste de saúde
+          # Teste de saúde com múltiplas tentativas
           echo "Testando health check..."
-          curl -f http://localhost:8080/actuator/health || \
-          (echo "❌ Health check falhou - verificando logs..." && docker logs test-app && exit 1)
+          for i in {1..5}; do
+            if curl -f http://localhost:8080/actuator/health; then
+              echo "✅ Health check passou!"
+              break
+            else
+              echo "❌ Tentativa $i falhou, aguardando..."
+              sleep 15
+            fi
+          done
           
-          echo "✅ Aplicação está respondendo!"
+          # Se todas as tentativas falharem, mostrar logs
+          curl -f http://localhost:8080/actuator/health || \
+          (echo "❌ Health check final falhou" && docker logs test-app && exit 1)
 
       - name: Logs on failure
         if: failure()
         run: |
           echo "=== LOGS DA APLICAÇÃO ==="
-          docker logs test-app || echo "Container da aplicação não encontrado"
+          docker logs test-app
           echo "=== CONTAINERS ATIVOS ==="
           docker ps -a
-          echo "=== NETWORKS ==="
-          docker network ls
-          echo "=== POSTGRES LOGS ==="
-          docker logs postgres || echo "Container PostgreSQL não encontrado"
 
       - name: Cleanup
         if: always()
         run: |
           docker stop test-app || true
           docker rm test-app || true
-          docker network rm test-network || true
