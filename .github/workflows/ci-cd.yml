@@ -3,9 +3,12 @@ name: CI/CD with PostgreSQL and Docker
 on:
   push:
     branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
 
 env:
   IMAGE_NAME: medicao-api
+  POSTGRES_PORT: 5433  # ✅ PORTA PADRÃO DEFINIDA
 
 jobs:
   build-and-test:
@@ -24,127 +27,64 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - ${{ env.POSTGRES_PORT }}:5432  # ✅ USA VARIÁVEL
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21  # ✅ ATUALIZADO PARA JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
-      - name: Build application
-        run: |
-          echo "🔨 Building application..."
-          mvn clean compile
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build and test with PostgreSQL
+        run: mvn clean package  # ✅ REMOVIDO skipTests
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:${{ env.POSTGRES_PORT }}/monitor_db
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: password123
-
-      - name: Run tests
-        run: |
-          echo "🧪 Running tests..."
-          mvn test
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
-          SPRING_DATASOURCE_USERNAME: postgres
-          SPRING_DATASOURCE_PASSWORD: password123
-
-      - name: Build JAR package
-        run: |
-          echo "📦 Building JAR..."
-          mvn clean package -DskipTests
-
-      - name: Verify JAR file
-        run: |
-          echo "🔍 Verifying JAR..."
-          ls -la target/
-          find target/ -name "*.jar" -type f
 
       - name: Build Docker image
         run: |
-          echo "🐳 Building Docker image..."
           docker build -t $IMAGE_NAME:$GITHUB_SHA .
+          docker images
 
       - name: Run container integration test
         run: |
-          echo "🚀 Running container tests..."
-          
-          # ✅ Start database
-          docker run -d --name test-db \
-            -e POSTGRES_DB=monitor_db \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=password123 \
-            -p 5433:5432 \
-            postgres:13
-          
-          sleep 20
-          echo "📊 PostgreSQL container started..."
-          
-          # ✅ Start application with logs visible
-          echo "🔍 Starting application with logs..."
-          docker run -d \
-            --name test-api \
-            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5433/monitor_db \
+          # ✅ Teste com a MESMA configuração do local
+          docker run -d --name test-container \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:${{ env.POSTGRES_PORT }}/monitor_db \
             -e SPRING_DATASOURCE_USERNAME=postgres \
             -e SPRING_DATASOURCE_PASSWORD=password123 \
-            -e SPRING_JPA_HIBERNATE_DDL_AUTO=update \
             -p 8080:8080 \
             $IMAGE_NAME:$GITHUB_SHA
           
-          # ✅ Show application logs
-          echo "📋 Waiting for application to start..."
-          sleep 35
-          echo "🔎 APPLICATION LOGS:"
-          docker logs test-api
+          echo "Aguardando aplicação iniciar..."
+          sleep 30
           
-          # ✅ Test multiple endpoints
-          echo "🔌 Testing connections..."
-          echo "1. Testing health endpoint:"
-          curl -v http://localhost:8080/actuator/health || echo "❌ Health check failed"
+          # ✅ Teste de saúde da aplicação
+          curl -f http://localhost:8080/actuator/health || \
+          curl -f http://localhost:8080/api/medicoes || \
+          (echo "❌ Aplicação não respondeu" && docker logs test-container && exit 1)
           
-          echo "2. Testing info endpoint:"
-          curl -v http://localhost:8080/actuator/info || echo "❌ Info endpoint failed"
-          
-          echo "3. Testing main API endpoint:"
-          curl -v http://localhost:8080/api/medicoes || echo "❌ API endpoint failed"
-          
-          # ✅ Don't fail immediately - just show logs
-          echo "🧹 Cleaning up containers..."
-          docker stop test-api test-db || true
-          docker rm test-api test-db || true
-          echo "✅ Container test completed (check logs above for issues)"
+          echo "✅ Teste de integração passou!"
 
-  debug-context:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Show GitHub Context
+      - name: Logs on failure
+        if: failure()
         run: |
-          echo "🔍 GITHUB CONTEXT:"
-          echo "Ref: '${{ github.ref }}'"
-          echo "Is main: ${{ github.ref == 'refs/heads/main' }}"
-          echo "Is develop: ${{ github.ref == 'refs/heads/develop' }}"
+          docker logs test-container || echo "Container não encontrado"
 
-  deploy-staging:
-    runs-on: ubuntu-latest
-    needs: [build-and-test, debug-context]
-    if: github.ref == 'refs/heads/develop'
-
-    steps:
-      - name: Deploy to Staging
+      - name: Cleanup
+        if: always()
         run: |
-          echo "📦 Deploying to STAGING environment"
-
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: [build-and-test, debug-context]
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Deploy to Production
-        run: |
-          echo "🎯 Deploying to PRODUCTION environment"
+          docker stop test-container || true
+          docker rm test-container || true
