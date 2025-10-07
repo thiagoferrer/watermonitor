@@ -3,16 +3,14 @@ version: '3.8'
 services:
   postgres:
     image: postgres:13
-    container_name: monitor-postgres
     environment:
       POSTGRES_DB: monitor_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password123
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-scripts:/docker-entrypoint-initdb.d
     networks:
       - monitor-network
     healthcheck:
@@ -23,41 +21,29 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
-    container_name: monitor-app
+    image: ghcr.io/your-username/monitor-app:develop
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: staging
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/monitor_db
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: password123
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SERVER_PORT: 8080
-      SPRING_H2_CONSOLE_ENABLED: "false"
+      LOGGING_LEVEL_COM_MONITOR: INFO
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./logs:/app/logs
-    networks:
-      - monitor-network
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    container_name: monitor-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - app_logs:/app/logs
     networks:
       - monitor-network
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:
+  app_logs:
 
 networks:
   monitor-network:
