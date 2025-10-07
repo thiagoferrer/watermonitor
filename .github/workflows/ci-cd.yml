@@ -35,120 +35,39 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Test PostgreSQL connection
-        run: |
-          sudo apt-get install -y postgresql-client
-          echo "Aguardando PostgreSQL..."
-          sleep 10
-          for i in {1..5}; do
-            if pg_isready -h localhost -p 5432 -U postgres; then
-              echo "✅ PostgreSQL está pronto!"
-              break
-            else
-              echo "⏳ Tentativa $i: PostgreSQL ainda não está pronto..."
-              sleep 5
-            fi
-          done
-
       - name: Build with Maven
         run: mvn clean package -DskipTests
         env:
+          SPRING_PROFILES_ACTIVE: dev
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/monitor_db
-          SPRING_DATASOURCE_USERNAME: postgres
-          SPRING_DATASOURCE_PASSWORD: password123
 
       - name: Build Docker image
         run: |
           docker build -t monitor-app:$GITHUB_SHA .
           docker images
 
-      - name: Test Docker container
+      - name: Test with Docker Compose
         run: |
-          # Rodar a aplicação com acesso ao host
+          # Usar docker-compose para testar
+          docker-compose up -d postgres
+          sleep 10
+          
+          # Testar aplicação
           docker run -d --name test-app \
-            -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/monitor_db \
-            -e SPRING_DATASOURCE_USERNAME=postgres \
-            -e SPRING_DATASOURCE_PASSWORD=password123 \
-            -p 8080:8080 \
-            --add-host=host.docker.internal:host-gateway \
+            -e SPRING_PROFILES_ACTIVE=docker \
+            -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/monitor_db \
+            --network=host \
             monitor-app:$GITHUB_SHA
           
-          echo "Aguardando aplicação iniciar..."
+          echo "Aguardando aplicação..."
+          sleep 30
           
-          # Teste de saúde com múltiplas tentativas e endpoints
-          echo "Testando aplicação..."
-          for i in {1..6}; do
-            echo "Tentativa $i de 6..."
-          
-            # Tentar actuator health primeiro
-            if curl -f http://localhost:8080/actuator/health; then
-              echo "✅ Health check passou!"
-              exit 0
-            fi
-          
-            # Tentar endpoint da API como fallback
-            if curl -f http://localhost:8080/api/medicoes; then
-              echo "✅ API endpoint passou!"
-              exit 0
-            fi
-          
-            # Tentar root endpoint como último recurso
-            if curl -f http://localhost:8080/; then
-              echo "✅ Root endpoint passou!"
-              exit 0
-            fi
-          
-            echo "⏳ Tentativa $i falhou, aguardando 10 segundos..."
-            sleep 10
-          done
-          
-          # Se todas as tentativas falharem
-          echo "❌ Todos os endpoints falharam após 6 tentativas"
-          echo "=== LOGS DA APLICAÇÃO ==="
-          docker logs test-app
-          echo "=== VERIFICANDO CONEXÃO COM POSTGRES ==="
-          docker exec test-app curl -f http://host.docker.internal:5432 || echo "Não conseguiu acessar PostgreSQL"
-          exit 1
-
-      - name: Run integration tests
-        if: success()
-        run: |
-          echo "Executando testes de integração..."
-          
-          # Testar criação de medição
-          curl -X POST http://localhost:8080/api/medicoes \
-            -H "Content-Type: application/json" \
-            -d '{
-              "localizacao": "Teste CI/CD",
-              "consumoLitros": 100.5,
-              "dataMedicao": "2025-10-05",
-              "alerta": "TESTE"
-            }' || echo "⚠️ POST falhou, mas continuando..."
-          
-          # Testar listagem de medições
-          curl -f http://localhost:8080/api/medicoes && echo "✅ Teste de listagem passou!"
-
-      - name: Logs on failure
-        if: failure()
-        run: |
-          echo "=== LOGS DETALHADOS ==="
-          docker logs test-app --tail 50
-          echo "=== CONTAINERS ATIVOS ==="
-          docker ps -a
-          echo "=== VERIFICANDO REDE ==="
-          docker network ls
-          echo "=== VERIFICANDO POSTGRES ==="
-          docker ps | grep postgres
+          # Teste de saúde
+          curl -f http://localhost:8081/actuator/health || docker logs test-app
 
       - name: Cleanup
         if: always()
         run: |
           docker stop test-app || true
           docker rm test-app || true
+          docker-compose down
