@@ -15,26 +15,10 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // URLs públicas - permitir tudo
-                        .requestMatchers(
-                                "/",
-                                "/api/medicoes/health",
-                                "/actuator/health",
-                                "/actuator/**",
-                                "/h2-console/**",
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/api-docs/**",
-                                "/webjars/**",
-                                "/swagger-resources/**",
-                                "/configuration/**",
-                                "/api/medicoes/**"
-                        ).permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().permitAll()  // ⬅️ PERMITE TUDO - PARA DEMO
                 )
                 .headers(headers -> headers
-                        .frameOptions(frame -> frame.disable()) // IMPORTANTE para H2 console
+                        .frameOptions(frame -> frame.disable())
                 );
 
         return http.build();
