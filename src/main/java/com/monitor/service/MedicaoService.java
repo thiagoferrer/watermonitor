@@ -14,7 +14,7 @@ public class MedicaoService {
     @Autowired
     private MedicaoRepository repository;
 
-    public List<Medicao> listarTodas() {
+    public List<Medicao> listarTodos() {
         return repository.findAll();
     }
 

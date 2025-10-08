@@ -30,12 +30,17 @@ public class MedicaoController {
 
     @GetMapping
     public List<Medicao> listarTodos() {
-        return service.listarTodas(); // CORRETO - bate com o Service
+        return service.listarTodos(); // CORRETO - bate com o Service
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("API Monitor está funcionando!");
     }
 }
