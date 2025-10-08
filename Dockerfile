@@ -29,8 +29,11 @@ RUN groupadd -r spring && useradd -r -g spring spring
 USER spring
 
 # Define variáveis de ambiente
-ARG PORT=8080
-ENV SERVER_PORT=$PORT
+ENV SERVER_PORT=8080
 ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseG1GC -Djava.security.egd=file:/dev/./urandom"
 
-# E
+# Expoe a porta
+EXPOSE 8080
+
+# Comando de execução
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
