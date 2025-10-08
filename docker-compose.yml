@@ -25,9 +25,9 @@ services:
     build: .
     container_name: monitor-app
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      SPRING_PROFILES_ACTIVE: docker  # Agora usa application-docker.properties
     ports:
-      - "8080:8080"
+      - "8080:8080"  # Docker na 8080
     depends_on:
       postgres:
         condition: service_healthy
