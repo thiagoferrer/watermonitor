@@ -212,7 +212,6 @@ jobs:
 | Documentação técnica com evidências (PDF ou PPT) | ✅ |
 | Deploy realizado nos ambientes staging e produção | ✅ |
 
-```
-**🎓 Disciplina:** Navegando pelo Mundo DevOps  
+
 **📅 Data de Entrega:** Outubro/2025
-```
+
